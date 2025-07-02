@@ -327,6 +327,62 @@
             border-color: #667eea;
         }
 
+        /* Mode Selector Styling */
+        .mode-selector {
+            background: white;
+            border-radius: 15px;
+            padding: 15px 25px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            text-align: center;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .mode-selector label {
+            font-weight: 600;
+            color: #4a5568;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .mode-selector input[type="radio"] {
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #667eea;
+            border-radius: 50%;
+            position: relative;
+            cursor: pointer;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        .mode-selector input[type="radio"]:checked {
+            background-color: #667eea;
+            border-color: #667eea;
+        }
+
+        .mode-selector input[type="radio"]:checked::before {
+            content: '';
+            display: block;
+            width: 10px;
+            height: 10px;
+            background-color: white;
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
         @media (max-width: 1024px) {
             .main-grid {
                 grid-template-columns: 1fr;
@@ -336,6 +392,10 @@
         @media (max-width: 768px) {
             .header h1 {
                 font-size: 2rem;
+            }
+            .mode-selector {
+                flex-direction: column;
+                gap: 10px;
             }
         }
     </style>
@@ -347,8 +407,20 @@
             <p>Turn tech news into viral comedy gold with AI-powered scripts!</p>
         </div>
 
-        <!-- API Configuration Panel -->
-        <div class="panel api-config">
+        <!-- Mode Selector -->
+        <div class="mode-selector">
+            <label>
+                <input type="radio" name="appMode" value="demo" checked onchange="toggleMode()">
+                Demo Mode (No API Keys Needed) ✨
+            </label>
+            <label>
+                <input type="radio" name="appMode" value="advanced" onchange="toggleMode()">
+                Advanced Mode (Use Your API Keys) 🔑
+            </label>
+        </div>
+
+        <!-- API Configuration Panel - Initially hidden -->
+        <div class="panel api-config" id="apiConfigPanel" style="display: none;">
             <h3>🔌 AI & News API Configuration</h3>
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px;">
                 <div class="input-group">
@@ -382,7 +454,7 @@
         <div class="main-grid">
             <!-- News Panel -->
             <div class="panel">
-                <h2>📰 Live Tech News</h2>
+                <h2>📰 Tech News</h2>
                 <div class="controls">
                     <div class="input-group">
                         <label>News Sources:</label>
@@ -406,11 +478,11 @@
                         <div class="filter-btn" data-filter="mobile">Mobile</div>
                     </div>
 
-                    <button class="btn" onclick="fetchRealNews()">🔄 Fetch Live News</button>
+                    <button class="btn" onclick="fetchNews()">🔄 Fetch News</button>
                     <button class="btn btn-secondary" onclick="detectTrending()">🔥 Detect Trending</button>
                     
                     <div id="newsContainer">
-                        <div class="loading">Configure API keys and click "Fetch Live News"...</div>
+                        <div class="loading">Select a mode above. In Demo Mode, news will load automatically. In Advanced Mode, enter your News API key and click "Fetch News".</div>
                     </div>
                 </div>
             </div>
@@ -493,7 +565,7 @@
                         <textarea id="customPrompt" placeholder="Add your comedic twist, running gags, or specific elements..." rows="3"></textarea>
                     </div>
 
-                    <button class="btn" onclick="generateAIScript()" id="generateBtn">🎬 Generate AI Script</button>
+                    <button class="btn" onclick="generateScript()" id="generateBtn">🎬 Generate Script</button>
                 </div>
             </div>
 
@@ -536,7 +608,7 @@
         <div class="panel full-width">
             <h2>📝 Generated Script & Viral Content</h2>
             <div id="scriptOutput" class="script-output">
-                Configure your API keys, select a news story, choose your format, and click "Generate AI Script" to create your viral TikTok masterpiece!
+                Select a mode above. In Demo Mode, news will load automatically and script generation will use a simple AI. In Advanced Mode, configure your API keys, select a news story, choose your format, and click "Generate Script" to create your viral TikTok masterpiece!
             </div>
         </div>
     </div>
@@ -546,6 +618,19 @@
         let selectedFormat = null;
         let currentFilter = 'all';
         let newsData = [];
+        let currentMode = 'demo'; // Default mode
+
+        // Utility to show messages
+        function showMessage(message, isError = false) {
+            const output = document.getElementById('scriptOutput');
+            const messageDiv = document.createElement('div');
+            messageDiv.textContent = message;
+            messageDiv.style.color = isError ? 'red' : 'green';
+            messageDiv.style.fontWeight = 'bold';
+            messageDiv.style.marginTop = '10px';
+            output.prepend(messageDiv); // Add to top of output
+            setTimeout(() => messageDiv.remove(), 5000);
+        }
 
         // Initialize format selection
         document.querySelectorAll('.format-card').forEach(card => {
@@ -566,11 +651,36 @@
             });
         });
 
-        // News API Integration
-        async function fetchRealNews() {
+        // Toggles between Demo and Advanced modes
+        function toggleMode() {
+            currentMode = document.querySelector('input[name="appMode"]:checked').value;
+            const apiConfigPanel = document.getElementById('apiConfigPanel');
+            const newsContainer = document.getElementById('newsContainer');
+            const scriptOutput = document.getElementById('scriptOutput');
+
+            if (currentMode === 'advanced') {
+                apiConfigPanel.style.display = 'block';
+                newsContainer.innerHTML = '<div class="loading">Enter your News API key and click "Fetch News".</div>';
+                scriptOutput.textContent = 'Configure your API keys, select a news story, choose your format, and click "Generate Script" to create your viral TikTok masterpiece!';
+            } else { // demo mode
+                apiConfigPanel.style.display = 'none';
+                // Automatically fetch trending news in demo mode
+                detectTrending(); 
+                scriptOutput.textContent = 'Select a news story and a format, then click "Generate Script" to create your viral TikTok masterpiece!';
+            }
+        }
+
+        // News API Integration (now called fetchNews to be generic)
+        async function fetchNews() {
+            if (currentMode === 'demo') {
+                detectTrending(); // In demo mode, fetch demo/trending news
+                return;
+            }
+
+            // Advanced Mode: Use actual News API
             const apiKey = document.getElementById('newsApiKey').value;
             if (!apiKey) {
-                alert('Please enter your News API key first!');
+                showMessage('Please enter your News API key first for Advanced Mode!', true);
                 return;
             }
 
@@ -598,6 +708,7 @@
                 }
             } catch (error) {
                 container.innerHTML = `<div class="loading">❌ Error: ${error.message}</div>`;
+                showMessage(`Error fetching news: ${error.message}`, true);
             }
         }
 
@@ -697,23 +808,15 @@
             }, 2000);
         }
 
-        // AI Script Generation
-        async function generateAIScript() {
+        // Main script generation function (now called generateScript)
+        async function generateScript() {
             if (!selectedNews) {
-                alert('Please select a news story first!');
+                showMessage('Please select a news story first!', true);
                 return;
             }
             
             if (!selectedFormat) {
-                alert('Please select a comedy format!');
-                return;
-            }
-
-            const aiProvider = document.getElementById('aiProvider').value;
-            const aiApiKey = document.getElementById('aiApiKey').value;
-            
-            if (!aiApiKey) {
-                alert('Please enter your AI API key!');
+                showMessage('Please select a comedy format!', true);
                 return;
             }
 
@@ -721,8 +824,7 @@
             const output = document.getElementById('scriptOutput');
             
             btn.disabled = true;
-            btn.textContent = '🤖 AI is writing your viral script...';
-            output.textContent = 'Generating your TikTok script with advanced AI...';
+            output.textContent = 'Generating your TikTok script...';
 
             const scriptParams = {
                 news: selectedNews,
@@ -736,18 +838,55 @@
             };
 
             try {
-                const script = await callAIAPI(aiProvider, aiApiKey, scriptParams);
+                let script;
+                if (currentMode === 'demo') {
+                    btn.textContent = '🤖 Generating demo script...';
+                    script = await callGeminiDemo(scriptParams); // Use Gemini for demo scripts
+                } else { // Advanced Mode
+                    const aiProvider = document.getElementById('aiProvider').value;
+                    const aiApiKey = document.getElementById('aiApiKey').value;
+                    
+                    if (!aiApiKey && aiProvider !== 'gemini') { // Gemini can use default key
+                        showMessage(`Please enter your API key for ${aiProvider} in Advanced Mode!`, true);
+                        btn.disabled = false;
+                        btn.textContent = '🎬 Generate Script';
+                        return;
+                    }
+                    btn.textContent = '🤖 AI is writing your viral script...';
+                    script = await callAIAPI(aiProvider, aiApiKey, scriptParams);
+                }
                 output.textContent = script;
             } catch (error) {
                 output.textContent = `Error generating script: ${error.message}\n\nFalling back to demo script...`;
+                showMessage(`Error generating script: ${error.message}`, true);
                 setTimeout(() => {
-                    output.textContent = generateDemoScript(scriptParams);
+                    output.textContent = generateDemoScript(scriptParams); // Fallback to hardcoded demo
                 }, 2000);
             }
 
             btn.disabled = false;
-            btn.textContent = '🎬 Generate AI Script';
+            btn.textContent = '🎬 Generate Script';
         }
+
+        // New function for Gemini in Demo Mode (uses Canvas-provided key)
+        async function callGeminiDemo(params) {
+            const prompt = buildAdvancedPrompt(params);
+            const apiKey = ""; // Canvas will provide this for gemini-2.0-flash
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }]
+                })
+            });
+            
+            const data = await response.json();
+            if (data.error) throw new Error(data.error.message);
+            return data.candidates[0].content.parts[0].text;
+        }
+
 
         async function callAIAPI(provider, apiKey, params) {
             const prompt = buildAdvancedPrompt(params);
@@ -758,7 +897,11 @@
                 case 'anthropic':
                     return await callAnthropic(apiKey, prompt);
                 case 'gemini':
-                    return await callGemini(apiKey, prompt);
+                    // If user selected Gemini in Advanced Mode, and provided a key, use gemini-pro
+                    // If no key, fall back to gemini-2.0-flash (Canvas injected key)
+                    const geminiModel = apiKey ? 'gemini-pro' : 'gemini-2.0-flash';
+                    const geminiApiKey = apiKey || ""; // Use provided key or empty for Canvas injection
+                    return await callGemini(geminiApiKey, prompt, geminiModel);
                 case 'cohere':
                     return await callCohere(apiKey, prompt);
                 default:
@@ -768,6 +911,7 @@
 
         function buildAdvancedPrompt(params) {
             return `Create a viral TikTok script based on this news: "${params.news.title}"
+${params.news.description ? `News Description: "${params.news.description}"` : ''}
 
 FORMAT: ${params.format}
 TONE: ${params.tone}
@@ -775,10 +919,10 @@ DURATION: ${params.duration} seconds
 CHARACTER STYLE: ${params.character}
 TARGET AUDIENCE: ${params.audience}
 VIRAL STRATEGY: ${params.strategy}
-CUSTOM ELEMENTS: ${params.custom}
+CUSTOM ELEMENTS: ${params.custom || 'None'}
 
 Requirements:
-- Professional script format with scene directions
+- Professional script format with scene directions (e.g., FADE IN, INT. LOCATION, CHARACTER NAME (dialogue))
 - Proper character development and dialogue
 - Visual/prop suggestions
 - Casting notes
@@ -799,7 +943,7 @@ The script should be immediately production-ready for TikTok creators.`;
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    model: 'gpt-4',
+                    model: 'gpt-4', // Using a capable model
                     messages: [{ role: 'user', content: prompt }],
                     max_tokens: 1500,
                     temperature: 0.8
@@ -820,7 +964,7 @@ The script should be immediately production-ready for TikTok creators.`;
                     'anthropic-version': '2023-06-01'
                 },
                 body: JSON.stringify({
-                    model: 'claude-3-sonnet-20240229',
+                    model: 'claude-3-sonnet-20240229', // Using a capable model
                     max_tokens: 1500,
                     messages: [{ role: 'user', content: prompt }]
                 })
@@ -831,8 +975,8 @@ The script should be immediately production-ready for TikTok creators.`;
             return data.content[0].text;
         }
 
-        async function callGemini(apiKey, prompt) {
-            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
+        async function callGemini(apiKey, prompt, model = 'gemini-pro') {
+            const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -853,7 +997,7 @@ The script should be immediately production-ready for TikTok creators.`;
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    model: 'command',
+                    model: 'command', // Using a capable model
                     prompt: prompt,
                     max_tokens: 1500,
                     temperature: 0.8
@@ -889,7 +1033,7 @@ It says here your product doesn't actually exist yet.
 
 SARAH
 (pause, then brightening)
-That's the BEAUTY of it! We're pre-disrupting the market!
+That's the BEAUTY of it! We're pre-disrupting the disruption space!
 
 INVESTOR 3 (DEREK, 30s, millennial)
 Did... did you just make that word up?
@@ -1008,9 +1152,6 @@ JENNY
 It keeps asking me about the meaning of breakfast and won't heat anything.
 
 APPLIANCE PSYCHOLOGIST (V.O.)
-Ah yes, Classic Carbohydrate Crisis. Have you tried validating its feelings?
-
-JENNY
 (incredulous)
 You want me to... emotionally support my TOASTER?
 
@@ -1047,17 +1188,116 @@ THE END
         // Viral Content Generation
         async function generateViralContent() {
             if (!selectedNews) {
-                alert('Please select a news story first!');
+                showMessage('Please select a news story first!', true);
                 return;
             }
 
             const viralContainer = document.getElementById('viralContent');
             viralContainer.innerHTML = '<div class="loading">🎯 Generating viral optimization package...</div>';
 
-            setTimeout(() => {
-                const viralPackage = createViralPackage();
-                viralContainer.innerHTML = viralPackage;
-            }, 2000);
+            // In Demo Mode, use a simple AI call for viral content
+            if (currentMode === 'demo') {
+                try {
+                    const viralPackage = await generateViralPackageAI(selectedNews, document.getElementById('targetAudience').value, document.getElementById('viralStrategy').value);
+                    viralContainer.innerHTML = viralPackage;
+                } catch (error) {
+                    showMessage(`Error generating viral content: ${error.message}`, true);
+                    viralContainer.innerHTML = createViralPackage(); // Fallback to hardcoded
+                }
+            } else { // Advanced Mode, use current hardcoded logic or extend with AI
+                setTimeout(() => {
+                    const viralPackage = createViralPackage();
+                    viralContainer.innerHTML = viralPackage;
+                }, 2000);
+            }
+        }
+
+        // New function to generate viral package using Gemini API for Demo Mode
+        async function generateViralPackageAI(news, audience, strategy) {
+            const prompt = `Generate trending TikTok hashtags, engagement hooks, and audio suggestions for a comedy sketch based on this tech news: "${news.title}".
+            Target Audience: ${audience}. Viral Strategy: ${strategy}.
+            
+            Provide the output in a structured format:
+            ### Trending Hashtags
+            - #tag1
+            - #tag2
+            
+            ### Engagement Hooks
+            - Hook 1
+            - Hook 2
+            
+            ### Trending Audio Suggestions
+            - Audio Name 1: Reason 1
+            - Audio Name 2: Reason 2
+            `;
+
+            const apiKey = ""; // Canvas will provide this for gemini-2.0-flash
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }]
+                })
+            });
+            
+            const data = await response.json();
+            if (data.error) throw new Error(data.error.message);
+            const aiContent = data.candidates[0].content.parts[0].text;
+
+            // Simple parsing of AI response into HTML structure
+            let htmlContent = `<div class="viral-tools">`;
+            const sections = aiContent.split('###').filter(s => s.trim() !== '');
+
+            sections.forEach(section => {
+                const lines = section.trim().split('\n');
+                const title = lines[0].trim();
+                const content = lines.slice(1).map(line => line.trim()).filter(line => line !== '');
+
+                if (title.includes('Hashtags')) {
+                    htmlContent += `<div class="viral-section"><h4>📱 ${title}</h4><div class="hashtag-list">`;
+                    content.forEach(item => {
+                        const tag = item.replace(/^- /, '').trim();
+                        if (tag) htmlContent += `<span class="hashtag" onclick="copyToClipboard('${tag}')">${tag}</span>`;
+                    });
+                    htmlContent += `</div></div>`;
+                } else if (title.includes('Hooks')) {
+                    htmlContent += `<div class="viral-section"><h4>🎣 ${title}</h4><ul>`;
+                    content.forEach(item => {
+                        const hook = item.replace(/^- /, '').trim();
+                        if (hook) htmlContent += `<li>${hook}</li>`;
+                    });
+                    htmlContent += `</ul></div>`;
+                } else if (title.includes('Audio')) {
+                    htmlContent += `<div class="viral-section"><h4>🎵 ${title}</h4><ul>`;
+                    content.forEach(item => {
+                        const audio = item.replace(/^- /, '').trim();
+                        if (audio) htmlContent += `<li>${audio}</li>`;
+                    });
+                    htmlContent += `</ul></div>`;
+                }
+            });
+
+            htmlContent += `
+                <div class="viral-section">
+                    <h4>⏰ Best Posting Times</h4>
+                    <p><strong>Weekdays:</strong> 6-10am, 7-9pm EST<br>
+                    <strong>Weekends:</strong> 9am-11am, 7-9pm EST<br>
+                    <strong>Best Days:</strong> Tuesday, Wednesday, Thursday</p>
+                </div>
+                <div class="viral-section">
+                    <h4>🎨 Design Tips</h4>
+                    <ul>
+                        <li><strong>Bright Colors:</strong> Use high contrast, vibrant colors</li>
+                        <li><strong>Large Text:</strong> Make sure text is readable on mobile</li>
+                        <li><strong>Faces:</strong> Include expressive human faces when possible</li>
+                        <li><strong>Emojis:</strong> 2-3 relevant emojis max for emotional impact</li>
+                        <li><strong>Brand Elements:</strong> Include recognizable tech logos/colors</li>
+                    </ul>
+                </div>
+            </div>`;
+            return htmlContent;
         }
 
         function createViralPackage() {
@@ -1181,11 +1421,81 @@ THE END
             const viralContainer = document.getElementById('viralContent');
             viralContainer.innerHTML = '<div class="loading">🖼️ Generating thumbnail concepts...</div>';
 
-            setTimeout(() => {
-                const thumbnailIdeas = createThumbnailIdeas();
-                viralContainer.innerHTML = thumbnailIdeas;
-            }, 1500);
+            // In Demo Mode, use a simple AI call for thumbnail ideas
+            if (currentMode === 'demo') {
+                try {
+                    const thumbnailIdeas = await generateThumbnailIdeasAI(selectedNews);
+                    viralContainer.innerHTML = thumbnailIdeas;
+                } catch (error) {
+                    showMessage(`Error generating thumbnails: ${error.message}`, true);
+                    viralContainer.innerHTML = createThumbnailIdeas(); // Fallback to hardcoded
+                }
+            } else { // Advanced Mode
+                setTimeout(() => {
+                    const thumbnailIdeas = createThumbnailIdeas();
+                    viralContainer.innerHTML = thumbnailIdeas;
+                }, 1500);
+            }
         }
+
+        // New function to generate thumbnail ideas using Gemini API for Demo Mode
+        async function generateThumbnailIdeasAI(news) {
+            const prompt = `Generate 3-5 viral TikTok thumbnail ideas for a comedy sketch based on this tech news: "${news.title}".
+            
+            Provide the output as a list of concepts and descriptions.
+            
+            Concept 1: Description 1
+            Concept 2: Description 2
+            `;
+
+            const apiKey = ""; // Canvas will provide this for gemini-2.0-flash
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }]
+                })
+            });
+            
+            const data = await response.json();
+            if (data.error) throw new Error(data.error.message);
+            const aiContent = data.candidates[0].content.parts[0].text;
+
+            let htmlContent = `<div class="viral-tools"><h4>🖼️ Viral Thumbnail Ideas</h4><div class="thumbnail-ideas">`;
+            const lines = aiContent.split('\n').filter(line => line.trim() !== '');
+
+            lines.forEach(line => {
+                const parts = line.split(':');
+                if (parts.length >= 2) {
+                    const concept = parts[0].trim();
+                    const description = parts.slice(1).join(':').trim();
+                    htmlContent += `
+                        <div class="thumbnail-card">
+                            <h5>${concept}</h5>
+                            <p>${description}</p>
+                        </div>
+                    `;
+                }
+            });
+            htmlContent += `</div>`; // Close thumbnail-ideas
+
+            htmlContent += `
+                <div class="viral-section">
+                    <h4>🎨 Design Tips</h4>
+                    <ul>
+                        <li><strong>Bright Colors:</strong> Use high contrast, vibrant colors</li>
+                        <li><strong>Large Text:</strong> Make sure text is readable on mobile</li>
+                        <li><strong>Faces:</strong> Include expressive human faces when possible</li>
+                        <li><strong>Emojis:</strong> 2-3 relevant emojis max for emotional impact</li>
+                        <li><strong>Brand Elements:</strong> Include recognizable tech logos/colors</li>
+                    </ul>
+                </div>
+            </div>`; // Close viral-tools
+            return htmlContent;
+        }
+
 
         function createThumbnailIdeas() {
             const thumbnails = [
@@ -1249,15 +1559,14 @@ THE END
                 setTimeout(() => {
                     event.target.textContent = originalText;
                 }, 1000);
+            }).catch(err => {
+                showMessage('Failed to copy text. Please copy manually.', true);
             });
         }
 
-        // Initialize with demo content
+        // Initialize on load
         window.addEventListener('load', () => {
-            // Simulate some demo news for immediate testing
-            setTimeout(() => {
-                detectTrending();
-            }, 1000);
+            toggleMode(); // Set initial mode based on default radio button
         });
     </script>
 </body>
